@@ -1,0 +1,15 @@
+name: advert_dashboard
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - uvicorn
+  - fastapi
+  - python-multipart                # for file uploads
+  - requests
+  - pillow                          # image helpers
+  - pip
+  - pip:
+      - python-dotenv               # read .env
+      - "python-jose[cryptography]" # JWT
+      - openai
