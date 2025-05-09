@@ -1,5 +1,8 @@
 /**
- * Dashboard.jsx – Advertising Dashboard (compact “+” add-interest)
+ * Dashboard.jsx – Advertising Dashboard
+ * ✅  Mantiene todo igual, pero el primer banner ya NO se estira a 100 %.
+ *     — Solución: limite máximo en la tarjeta (.card { max-width }) +
+ *       centrado opcional del grid.
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -25,20 +28,20 @@ export default function Dashboard() {
     interests: [],
   };
 
-  const [form,      setForm]      = useState(emptyForm);
+  const [form, setForm] = useState(emptyForm);
   const [campaigns, setCampaigns] = useState([]);
-  const [loading,   setLoading]   = useState(false);
+  const [loading, setLoading] = useState(false);
   const [modalData, setModalData] = useState(null);
 
-  /* dynamic interest list */
-  const [options,   setOptions]   = useState([
-    "Sports","Gaming","Fashion","Tech","Travel","Music",
+  /* interests dinámicos */
+  const [options, setOptions] = useState([
+    "Sports", "Gaming", "Fashion", "Tech", "Travel", "Music",
   ]);
 
   /* ───────── fetch campaigns ───────── */
-  useEffect(() => { api.get("/campaigns").then(r=>setCampaigns(r.data)); }, []);
+  useEffect(() => { api.get("/campaigns").then(r => setCampaigns(r.data)); }, []);
 
-  /* ───────── handlers ───────── */
+  /* ───────── helpers ───────── */
   const onInput = e => setForm({ ...form, [e.target.name]: e.target.value });
   const onFile  = e => setForm({ ...form, imageFile: e.target.files[0] });
 
@@ -50,73 +53,73 @@ export default function Dashboard() {
         : [...p.interests, label],
     }));
 
-  /* ➊ compact “+” chip -> prompt */
   const handleAddInterest = () => {
     const label = prompt("New interest:")?.trim();
     if (!label) return;
     if (!options.includes(label)) setOptions(o => [...o, label]);
-    setForm(p => ({
-      ...p,
-      interests: p.interests.includes(label)
-        ? p.interests
-        : [...p.interests, label],
-    }));
+    if (!form.interests.includes(label))
+      setForm(p => ({ ...p, interests: [...p.interests, label] }));
   };
 
-  /* dual-range slider */
-  const trackRef=useRef(null);
-  const syncTrack=(l,r)=>{
-    if(!trackRef.current) return;
-    const range=AGE_MAX-AGE_MIN;
-    trackRef.current.style.left =`${((l-AGE_MIN)/range)*100}%`;
-    trackRef.current.style.right=`${100-((r-AGE_MIN)/range)*100}%`;
+  /* dual-range slider logic */
+  const trackRef = useRef(null);
+  const syncTrack = (l, r) => {
+    if (!trackRef.current) return;
+    const range = AGE_MAX - AGE_MIN;
+    trackRef.current.style.left  = `${((l - AGE_MIN) / range) * 100}%`;
+    trackRef.current.style.right = `${100 - ((r - AGE_MIN) / range) * 100}%`;
   };
-  useEffect(()=>syncTrack(form.ageMin,form.ageMax),[]);
-  const onAgeMin=e=>{
-    let v=+e.target.value;
-    if(v>form.ageMax-1)v=form.ageMax-1;
-    setForm(p=>{const n={...p,ageMin:v};syncTrack(v,n.ageMax);return n;});
+  useEffect(() => syncTrack(form.ageMin, form.ageMax), []);
+  const onAgeMin = e => {
+    let v = +e.target.value;
+    if (v > form.ageMax - 1) v = form.ageMax - 1;
+    setForm(p => { const n = { ...p, ageMin: v }; syncTrack(v, n.ageMax); return n; });
   };
-  const onAgeMax=e=>{
-    let v=+e.target.value;
-    if(v<form.ageMin+1)v=form.ageMin+1;
-    setForm(p=>{const n={...p,ageMax:v};syncTrack(n.ageMin,v);return n;});
+  const onAgeMax = e => {
+    let v = +e.target.value;
+    if (v < form.ageMin + 1) v = form.ageMin + 1;
+    setForm(p => { const n = { ...p, ageMax: v }; syncTrack(n.ageMin, v); return n; });
   };
 
   /* upload helper */
-  const uploadRef=async()=>{
-    if(!(form.useReference||form.derivePrompt))return null;
-    if(form.imageFile){
-      const fd=new FormData();fd.append("file",form.imageFile);
-      const{data}=await api.post("/upload_reference",fd);return data.filename;
+  const uploadRef = async () => {
+    if (!(form.useReference || form.derivePrompt)) return null;
+    if (form.imageFile) {
+      const fd = new FormData(); fd.append("file", form.imageFile);
+      const { data } = await api.post("/upload_reference", fd);
+      return data.filename;
     }
-    if(form.imageUrl.trim()){
-      const{data}=await api.post("/upload_reference_url",null,
-        {params:{url:form.imageUrl.trim()}});return data.filename;
+    if (form.imageUrl.trim()) {
+      const { data } = await api.post("/upload_reference_url", null,
+        { params: { url: form.imageUrl.trim() } });
+      return data.filename;
     }
     return null;
   };
 
   /* submit */
-  const submit=async e=>{
-    e.preventDefault();setLoading(true);
-    try{
-      const ref=await uploadRef();
-      const payload={
-        name:form.name,prompt:form.prompt,
-        use_reference:form.useReference,
-        derive_prompt_from_reference:form.derivePrompt,
-        reference_filename:ref,
-        targeting:{
-          age_min:form.ageMin,age_max:form.ageMax,
-          location:form.location,interests:form.interests,
+  const submit = async e => {
+    e.preventDefault(); setLoading(true);
+    try {
+      const ref = await uploadRef();
+      const payload = {
+        name: form.name,
+        prompt: form.prompt,
+        use_reference: form.useReference,
+        derive_prompt_from_reference: form.derivePrompt,
+        reference_filename: ref,
+        targeting: {
+          age_min: form.ageMin,
+          age_max: form.ageMax,
+          location: form.location,
+          interests: form.interests,
         },
       };
-      const{data}=await api.post("/campaigns",payload);
-      setCampaigns([data,...campaigns]);
-      setForm(emptyForm);syncTrack(emptyForm.ageMin,emptyForm.ageMax);
-    }catch(err){console.error(err);}
-    finally{setLoading(false);}
+      const { data } = await api.post("/campaigns", payload);
+      setCampaigns([data, ...campaigns]);
+      setForm(emptyForm); syncTrack(emptyForm.ageMin, emptyForm.ageMax);
+    } catch (err) { console.error(err); }
+    finally      { setLoading(false); }
   };
 
   /* ───────── UI ───────── */
@@ -129,23 +132,25 @@ export default function Dashboard() {
         </div>
       )}
 
-      <ModalView data={modalData} onClose={()=>setModalData(null)} />
+      <ModalView data={modalData} onClose={() => setModalData(null)} />
 
       <div className="min-h-screen flex flex-col">
+        {/* header */}
         <header>
           <div className="bar">
             <h1>Ad Dashboard</h1>
             <button className="logout-btn"
-              onClick={()=>{localStorage.removeItem("token");location.reload();}}>
+              onClick={() => { localStorage.removeItem("token"); location.reload(); }}>
               Logout
             </button>
           </div>
         </header>
 
+        {/* main */}
         <main className="center">
           <div className="slide">
             {/* form */}
-            <section style={{marginBottom:40}}>
+            <section style={{ marginBottom: 40 }}>
               <h2 className="title">Create Campaign</h2>
 
               <form onSubmit={submit} className="form-grid">
@@ -156,7 +161,7 @@ export default function Dashboard() {
 
                 <div className="form-group full">
                   <label>Prompt / Tagline</label>
-                  <textarea name="prompt" rows={3} style={{resize:"vertical"}}
+                  <textarea name="prompt" rows={3} style={{ resize:"vertical" }}
                     placeholder="Describe your ad creative…" value={form.prompt}
                     onChange={onInput} required/>
                 </div>
@@ -166,11 +171,11 @@ export default function Dashboard() {
                   <label>Age Range: {form.ageMin} – {form.ageMax}</label>
                   <div className="range-container">
                     <input type="range" min={AGE_MIN} max={AGE_MAX}
-                           value={form.ageMin} onChange={onAgeMin}
-                           className="thumb thumb--left"/>
+                      value={form.ageMin} onChange={onAgeMin}
+                      className="thumb thumb--left"/>
                     <input type="range" min={AGE_MIN} max={AGE_MAX}
-                           value={form.ageMax} onChange={onAgeMax}
-                           className="thumb thumb--right"/>
+                      value={form.ageMax} onChange={onAgeMax}
+                      className="thumb thumb--right"/>
                     <div className="range-slider__track"/>
                     <div className="range-slider__range" ref={trackRef}/>
                   </div>
@@ -203,9 +208,8 @@ export default function Dashboard() {
 
                 <div className="form-group">
                   <label>Image URL (optional)</label>
-                  <input name="imageUrl" value={form.imageUrl}
-                         onChange={onInput} placeholder="https://…"
-                         disabled={!(form.useReference||form.derivePrompt)}/>
+                  <input name="imageUrl" value={form.imageUrl} onChange={onInput}
+                         placeholder="https://…" disabled={!(form.useReference||form.derivePrompt)}/>
                 </div>
                 <div className="form-group">
                   <label>Upload Image</label>
@@ -213,20 +217,19 @@ export default function Dashboard() {
                          disabled={!(form.useReference||form.derivePrompt)}/>
                 </div>
 
-                {/* interests with compact + */}
+                {/* interests */}
                 <div className="form-group full">
                   <label>Interests</label>
                   <div className="chip-wrapper">
                     {options.map(l=>(
                       <label key={l}
-                             className={`chip ${form.interests.includes(l)?"chip--active":""}`}>
+                        className={`chip ${form.interests.includes(l)?'chip--active':''}`}>
                         <input type="checkbox" style={{display:"none"}}
-                               checked={form.interests.includes(l)}
-                               onChange={()=>toggleInterest(l)}/>
+                          checked={form.interests.includes(l)}
+                          onChange={()=>toggleInterest(l)}/>
                         {l}
                       </label>
                     ))}
-                    {/* + chip */}
                     <div className="chip chip--add" title="Add interest" onClick={handleAddInterest}>+</div>
                   </div>
                 </div>
@@ -271,7 +274,7 @@ export default function Dashboard() {
 
       {/* ───────── styles ───────── */}
       <style>{`
-        /* dual-range slider */
+        /* dual-range slider (igual) */
         .range-container{position:relative;height:40px}
         .range-container input[type=range]{pointer-events:none;position:absolute;left:0;top:0;width:100%;height:40px;background:none;margin:0;-webkit-appearance:none;}
         .range-container input[type=range]::-webkit-slider-thumb{pointer-events:all;width:18px;height:18px;border-radius:50%;background:#4f46e5;border:none;-webkit-appearance:none;}
@@ -286,7 +289,24 @@ export default function Dashboard() {
         .chip--active{background:#e0e7ff;border-color:#4f46e5}
         .chip--add{font-weight:700;background:#eef2ff;border-color:#c7d2fe;}
 
-        /* basic */
+        /* grid + card size fix */
+        .grid-campaign{
+          display:grid;
+          gap:16px;
+          grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+          justify-content:flex-start;        /* evita expansión y alinea a la izquierda */
+        }
+        .card{
+          position:relative;
+          padding:12px;
+          border:1px solid #e5e7eb;
+          border-radius:8px;
+          background:#fff;
+          max-width:300px;                   /* 👈 evita que una sola tarjeta se estire */
+          width:100%;
+        }
+
+        /* misc */
         .title{font-size:20px;font-weight:600}
         .form-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
         .form-group{display:flex;flex-direction:column}.form-group.full{grid-column:span 2}
@@ -306,8 +326,6 @@ export default function Dashboard() {
         .spinner{width:48px;height:48px;border:6px solid #e5e7eb;border-top-color:#4f46e5;border-radius:50%;animation:spin .8s linear infinite}
         @keyframes spin{to{transform:rotate(360deg)}}
         .loader-msg{margin-top:12px;font-weight:500;color:#4f46e5}
-        .grid-campaign{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
-        .card{position:relative;padding:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff}
         .banner-img{width:100%;height:120px;object-fit:cover;border-radius:8px;margin-top:6px}
         .text-small{font-size:14px;color:#374151}.quote{font-size:14px;font-style:italic;color:#1f2937;margin-top:6px}
       `}</style>
